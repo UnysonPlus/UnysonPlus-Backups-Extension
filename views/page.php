@@ -66,10 +66,93 @@ $page_url = $backups->get_page_url();
 	</div>
 </div>
 
+<?php
+/**
+ * Selective backup + auto-cleanup panel (@since 2.0.41)
+ */
+$selectable = $backups->get_selectable_dirs();
+$excluded   = $backups->get_excluded_dirs();
+$keep_last  = $backups->get_keep_last();
+$col_labels = array(
+	'plugins' => __('Plugins', 'fw'),
+	'themes'  => __('Themes', 'fw'),
+	'uploads' => __('Uploads', 'fw'),
+);
+?>
+<div id="fw-ext-backups-options" class="fw-ext-backups-options">
+	<h3>
+		<a href="#" onclick="return false;" class="fw-ext-backups-options-toggle">
+			<span class="dashicons dashicons-arrow-right-alt2"></span>
+			<?php esc_html_e('Selective Backup &amp; Cleanup', 'fw'); ?>
+		</a>
+	</h3>
+
+	<div class="fw-ext-backups-options-body" style="display:none;">
+		<p class="description">
+			<?php esc_html_e('Uncheck a folder to exclude it from backups. Plugins and Themes apply to Full backups; Uploads applies to both Full and Content backups.', 'fw'); ?>
+		</p>
+
+		<div class="fw-ext-backups-columns">
+			<?php foreach ($col_labels as $cat => $label): ?>
+				<div class="fw-ext-backups-column" data-cat="<?php echo esc_attr($cat); ?>">
+					<div class="fw-ext-backups-column-head">
+						<label>
+							<input type="checkbox" class="fw-ext-backups-checkall" checked>
+							<strong><?php echo esc_html($label); ?></strong>
+						</label>
+					</div>
+					<ul>
+						<?php if (empty($selectable[$cat])): ?>
+							<li><em class="fw-text-muted"><?php esc_html_e('No folders', 'fw'); ?></em></li>
+						<?php else: foreach ($selectable[$cat] as $name): ?>
+							<li>
+								<label>
+									<input type="checkbox" class="fw-ext-backups-dir"
+									       value="<?php echo esc_attr($name); ?>"
+									       <?php checked(!isset($excluded[$cat][$name])); ?>>
+									<?php echo esc_html($name); ?>
+								</label>
+							</li>
+						<?php endforeach; endif; ?>
+					</ul>
+				</div>
+			<?php endforeach; ?>
+		</div>
+
+		<p class="fw-ext-backups-keep-last">
+			<label>
+				<?php esc_html_e('Keep only the last', 'fw'); ?>
+				<input type="number" min="0" step="1" id="fw-ext-backups-keep-last"
+				       value="<?php echo esc_attr($keep_last); ?>" style="width:70px;">
+				<?php esc_html_e('backups (0 = keep all). Older archives are deleted automatically after each new backup.', 'fw'); ?>
+			</label>
+		</p>
+
+		<p>
+			<a href="#" onclick="return false;" id="fw-ext-backups-save-options"
+			   class="button button-primary"><?php esc_html_e('Save selection', 'fw'); ?></a>
+			<span id="fw-ext-backups-options-msg" class="fw-text-muted" style="margin-left:8px;"></span>
+		</p>
+	</div>
+</div>
+
 <br>
 <h3><?php _e( 'Archives', 'fw' ) ?></h3>
 
 <div id="fw-ext-backups-archives"><?php echo $archives_html; ?></div>
+
+<div id="fw-ext-backups-upload" class="fw-ext-backups-upload">
+	<h4><?php esc_html_e('Upload a Backup', 'fw'); ?></h4>
+	<p class="description">
+		<?php esc_html_e('Upload a .zip backup created by this extension to add it to the archives above, then you can Restore it.', 'fw'); ?>
+	</p>
+	<p>
+		<input type="file" id="fw-ext-backups-upload-file" accept=".zip,application/zip">
+		<a href="#" onclick="return false;" id="fw-ext-backups-upload-button"
+		   class="button"><?php esc_html_e('Upload Backup', 'fw'); ?></a>
+		<span id="fw-ext-backups-upload-msg" class="fw-text-muted" style="margin-left:8px;"></span>
+	</p>
+</div>
 
 <br>
 <?php do_action('fw_ext_backups_page_footer'); ?>

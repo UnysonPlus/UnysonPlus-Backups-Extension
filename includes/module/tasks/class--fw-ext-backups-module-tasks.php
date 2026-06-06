@@ -839,15 +839,31 @@ class _FW_Ext_Backups_Module_Tasks extends _FW_Ext_Backups_Module {
 				'full' => $full,
 			)
 		));
+		$exclude_paths = ( is_multisite() && ($wp_upload_dir = wp_upload_dir()) )
+			? array(fw_fix_path($wp_upload_dir['basedir']) .'/sites' => true)
+			: array();
+
+		/**
+		 * Selective backup: exclude the top-level folders the user de-selected.
+		 * Plugins/themes only exist for full backups; uploads applies to both.
+		 * @since 2.0.41
+		 */
+		$excluded_dirs = self::backups()->get_excluded_dirs();
+		foreach (array('plugins', 'themes', 'uploads') as $cat) {
+			if (!empty($excluded_dirs[$cat]) && isset($dirs[$cat])) {
+				foreach ($excluded_dirs[$cat] as $name => $v) {
+					$exclude_paths[ fw_fix_path($dirs[$cat] .'/'. $name) ] = true;
+				}
+			}
+		}
+
 		$collection->add_task(new FW_Ext_Backups_Task(
 			$id_prefix .'files-export',
 			'files-export',
 			array(
 				'source_dirs' => $dirs,
 				'destination' => $tmp_dir .'/f',
-				'exclude_paths' => ( is_multisite() && ($wp_upload_dir = wp_upload_dir()) )
-					? array(fw_fix_path($wp_upload_dir['basedir']) .'/sites' => true)
-					: array(),
+				'exclude_paths' => $exclude_paths,
 			)
 		));
 		if (

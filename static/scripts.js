@@ -614,3 +614,150 @@ jQuery(function($){
 
 	inst.init();
 });
+
+/**
+ * Shared: extract a human message from a wp_send_json_error() response
+ * (handles both array('message'=>..) and WP_Error array shapes)
+ * @since 2.0.41
+ */
+function fwExtBackupsErrMsg(r, fallback) {
+	var d = r && r.data;
+	if (typeof d === 'string') { return d; }
+	if (d && d.message) { return d.message; }
+	if (d && d[0] && d[0].message) { return d[0].message; }
+	return fallback || 'Error';
+}
+
+/**
+ * Selective backup + cleanup options panel
+ * @since 2.0.41
+ */
+jQuery(function($){
+	var localized = _fw_ext_backups_localized,
+		$panel = $('#fw-ext-backups-options'),
+		$body = $panel.find('.fw-ext-backups-options-body'),
+		fwLoadingId = 'fw-ext-backups-options';
+
+	if (!$panel.length) {
+		return;
+	}
+
+	// Collapse / expand
+	$panel.on('click', '.fw-ext-backups-options-toggle', function(){
+		$body.slideToggle(150);
+		$panel.toggleClass('open');
+	});
+
+	// "Check all" toggles every folder in its column
+	$panel.on('change', '.fw-ext-backups-checkall', function(){
+		$(this).closest('.fw-ext-backups-column')
+			.find('.fw-ext-backups-dir')
+			.prop('checked', this.checked);
+	});
+
+	// Keep each column's "check all" in sync with its items
+	$panel.on('change', '.fw-ext-backups-dir', function(){
+		var $col = $(this).closest('.fw-ext-backups-column'),
+			total = $col.find('.fw-ext-backups-dir').length,
+			checked = $col.find('.fw-ext-backups-dir:checked').length;
+		$col.find('.fw-ext-backups-checkall').prop('checked', total === checked && total > 0);
+	});
+
+	$('#fw-ext-backups-save-options').on('click', function(){
+		var excluded = {};
+
+		$panel.find('.fw-ext-backups-column').each(function(){
+			var cat = $(this).attr('data-cat'),
+				list = [];
+			$(this).find('.fw-ext-backups-dir').each(function(){
+				if (!this.checked) {
+					list.push($(this).val()); // unchecked = excluded
+				}
+			});
+			excluded[cat] = list;
+		});
+
+		fw.loading.show(fwLoadingId);
+		$('#fw-ext-backups-options-msg').text('');
+
+		$.ajax({
+			url: ajaxurl,
+			type: 'POST',
+			dataType: 'json',
+			data: {
+				action: localized.ajax_action_options,
+				nonce: localized.options_nonce,
+				excluded: excluded,
+				keep_last: $('#fw-ext-backups-keep-last').val()
+			}
+		})
+			.done(function(r){
+				$('#fw-ext-backups-options-msg').text(
+					r.success ? localized.l10n.options_saved : fwExtBackupsErrMsg(r)
+				);
+			})
+			.fail(function(jqXHR, textStatus, errorThrown){
+				fw.soleModal.show(
+					'fw-ext-backups-options-error',
+					'<h2>Ajax error</h2><p>'+ String(errorThrown) +'</p>'
+				);
+			})
+			.always(function(){
+				fw.loading.hide(fwLoadingId);
+			});
+	});
+});
+
+/**
+ * Upload a backup archive
+ * @since 2.0.41
+ */
+jQuery(function($){
+	var localized = _fw_ext_backups_localized,
+		fwLoadingId = 'fw-ext-backups-upload';
+
+	$('#fw-ext-backups-upload-button').on('click', function(){
+		var input = document.getElementById('fw-ext-backups-upload-file'),
+			$msg = $('#fw-ext-backups-upload-msg');
+
+		if (!input || !input.files || !input.files.length) {
+			$msg.text(localized.l10n.upload_no_file);
+			return;
+		}
+
+		var fd = new FormData();
+		fd.append('action', localized.ajax_action_upload);
+		fd.append('nonce', localized.upload_nonce);
+		fd.append('file', input.files[0]);
+
+		fw.loading.show(fwLoadingId);
+		$msg.text('');
+
+		$.ajax({
+			url: ajaxurl,
+			type: 'POST',
+			data: fd,
+			processData: false,
+			contentType: false,
+			dataType: 'json'
+		})
+			.done(function(r){
+				if (r.success) {
+					$msg.text(localized.l10n.upload_done);
+					input.value = '';
+					fwEvents.trigger('fw:ext:backups:status:do-update'); // refresh archives
+				} else {
+					$msg.text(fwExtBackupsErrMsg(r));
+				}
+			})
+			.fail(function(jqXHR, textStatus, errorThrown){
+				fw.soleModal.show(
+					'fw-ext-backups-upload-error',
+					'<h2>Ajax error</h2><p>'+ String(errorThrown) +'</p>'
+				);
+			})
+			.always(function(){
+				fw.loading.hide(fwLoadingId);
+			});
+	});
+});

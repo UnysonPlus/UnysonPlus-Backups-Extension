@@ -2,6 +2,23 @@
     die( 'Forbidden' );
 }
 
+/**
+ * Changelog ----------------------------------------------------------------
+ *
+ * 2.0.41 - Selective backup, automatic cleanup, and backup upload. You can now
+ *          un-check individual top-level Plugins / Themes / Uploads folders to
+ *          exclude them from backups (Plugins and Themes apply to full backups,
+ *          Uploads applies to both) via a new collapsible "Selective Backup &
+ *          Cleanup" panel on the Backup page; the choices are stored in the
+ *          'fw:ext:backups:excluded_dirs' option and fed into the files-export
+ *          task exclude list, so they apply to manual and scheduled backups
+ *          alike. A "keep last N" setting auto-deletes older archives after each
+ *          new backup (runs on the zip task success hook; 0 = keep all). And a
+ *          new Upload control lets you add a .zip backup created by this
+ *          extension straight into the archives list so it can be restored
+ *          (validated to be a real backup archive before being stored).
+ */
+
 $manifest = array();
 
 // Basic Info
@@ -12,7 +29,7 @@ $manifest['description'] = __(
     'unysonplus'
 );
 
-$manifest['version']     = '2.0.40';
+$manifest['version']     = '2.0.41';
 $manifest['display']     = true;
 $manifest['standalone']  = true;
 

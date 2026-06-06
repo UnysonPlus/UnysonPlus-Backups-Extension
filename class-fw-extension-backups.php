@@ -30,8 +30,17 @@ class FW_Extension_Backups extends FW_Extension {
 	private static $wp_ajax_action_restore = 'fw:ext:backups:restore';
 	private static $wp_ajax_action_delete  = 'fw:ext:backups:delete';
 	private static $wp_ajax_action_cancel  = 'fw:ext:backups:cancel';
+	private static $wp_ajax_action_options = 'fw:ext:backups:save-options';
+	private static $wp_ajax_action_upload  = 'fw:ext:backups:upload';
 
 	private static $wp_ajax_action_test    = 'fw:ext:backups:test';
+
+	/**
+	 * WP options used by the selective-backup and auto-cleanup features.
+	 * @since 2.0.41
+	 */
+	private static $wp_option_excluded_dirs = 'fw:ext:backups:excluded_dirs';
+	private static $wp_option_keep_last     = 'fw:ext:backups:keep_last';
 
 	private static $download_GET_parameter = 'download-archive';
 
@@ -157,10 +166,19 @@ class FW_Extension_Backups extends FW_Extension {
 				add_action('wp_ajax_' . self::$wp_ajax_action_restore, array($this, '_action_ajax_restore'));
 				add_action('wp_ajax_' . self::$wp_ajax_action_delete,  array($this, '_action_ajax_delete'));
 				add_action('wp_ajax_' . self::$wp_ajax_action_cancel,  array($this, '_action_ajax_cancel'));
+				add_action('wp_ajax_' . self::$wp_ajax_action_options, array($this, '_action_ajax_save_options'));
+				add_action('wp_ajax_' . self::$wp_ajax_action_upload,  array($this, '_action_ajax_upload'));
 			}
 
 			add_action('network_admin_menu', array($this, '_action_admin_menu'));
 			add_action('wp_ajax_nopriv_' . self::$wp_ajax_action_test,  array($this, '_action_ajax_test'));
+
+			/**
+			 * Auto-cleanup: after a backup zip is created, prune old archives
+			 * down to the configured "keep last N" limit.
+			 * @since 2.0.41
+			 */
+			add_action('fw:ext:backups:task:success', array($this, '_action_cleanup_old_archives'));
 		}
 
 		$dir = dirname(__FILE__);
@@ -277,8 +295,15 @@ class FW_Extension_Backups extends FW_Extension {
 						'ajax_action_restore' => self::$wp_ajax_action_restore,
 						'ajax_action_delete'  => self::$wp_ajax_action_delete,
 						'ajax_action_cancel'  => self::$wp_ajax_action_cancel,
+						'ajax_action_options' => self::$wp_ajax_action_options,
+						'ajax_action_upload'  => self::$wp_ajax_action_upload,
+						'options_nonce'       => wp_create_nonce(self::$wp_ajax_action_options),
+						'upload_nonce'        => wp_create_nonce(self::$wp_ajax_action_upload),
 						'l10n' => array(
-							'abort_confirm' => __('Are you sure?', 'fw'),
+							'abort_confirm'   => __('Are you sure?', 'fw'),
+							'options_saved'   => __('Selection saved.', 'fw'),
+							'upload_no_file'  => __('Please choose a .zip backup file first.', 'fw'),
+							'upload_done'     => __('Backup uploaded.', 'fw'),
 						),
 					)
 				)
@@ -554,6 +579,277 @@ class FW_Extension_Backups extends FW_Extension {
 		} else {
 			return ($a['time'] > $b['time']) ? -1 : 1;
 		}
+	}
+
+	/* ---------------------------------------------------------------------
+	 * Selective backup + auto-cleanup  (@since 2.0.41)
+	 * ------------------------------------------------------------------- */
+
+	/**
+	 * Top-level folders the user can include/exclude from a backup, grouped by
+	 * category. Plugins/themes apply to full backups; uploads to both.
+	 *
+	 * @return array {plugins: ['name', ...], themes: [...], uploads: [...]}
+	 */
+	public function get_selectable_dirs() {
+		$wp_upload_dir = wp_upload_dir();
+
+		$roots = array(
+			'plugins' => WP_PLUGIN_DIR,
+			'themes'  => get_theme_root(),
+			'uploads' => $wp_upload_dir['basedir'],
+		);
+
+		// Internal/own folders that shouldn't be offered in the uploads column
+		$uploads_skip = array(
+			'fw-backup' => true, 'fw' => true, 'backup' => true, 'sites' => true,
+		);
+
+		$result = array('plugins' => array(), 'themes' => array(), 'uploads' => array());
+
+		foreach ($roots as $cat => $root) {
+			$root = fw_fix_path($root);
+
+			if (!is_dir($root) || !($names = scandir($root))) {
+				continue;
+			}
+
+			foreach ($names as $name) {
+				if ($name === '.' || $name === '..' || $name[0] === '.') {
+					continue;
+				}
+				if (!is_dir($root .'/'. $name)) {
+					continue;
+				}
+				if ($cat === 'uploads' && isset($uploads_skip[$name])) {
+					continue;
+				}
+
+				$result[$cat][] = $name;
+			}
+
+			sort($result[$cat]);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * @return array {plugins: {name: true}, themes: {...}, uploads: {...}}
+	 */
+	public function get_excluded_dirs() {
+		$excluded = get_option(self::$wp_option_excluded_dirs, array());
+
+		if (!is_array($excluded)) {
+			$excluded = array();
+		}
+
+		foreach (array('plugins', 'themes', 'uploads') as $cat) {
+			if (empty($excluded[$cat]) || !is_array($excluded[$cat])) {
+				$excluded[$cat] = array();
+			}
+		}
+
+		return $excluded;
+	}
+
+	/**
+	 * @param array $excluded {plugins: {name: true}, themes: {...}, uploads: {...}}
+	 */
+	public function set_excluded_dirs(array $excluded) {
+		$clean = array('plugins' => array(), 'themes' => array(), 'uploads' => array());
+
+		foreach (array('plugins', 'themes', 'uploads') as $cat) {
+			if (!empty($excluded[$cat]) && is_array($excluded[$cat])) {
+				foreach ($excluded[$cat] as $name => $v) {
+					$name = basename((string) $name); // prevent path traversal
+					if ($name !== '' && $name !== '.' && $name !== '..') {
+						$clean[$cat][$name] = true;
+					}
+				}
+			}
+		}
+
+		update_option(self::$wp_option_excluded_dirs, $clean, false);
+	}
+
+	/**
+	 * Number of most-recent archives to keep (0 = unlimited).
+	 * @return int
+	 */
+	public function get_keep_last() {
+		return max(0, (int) get_option(self::$wp_option_keep_last, 0));
+	}
+
+	/**
+	 * @param int $n
+	 */
+	public function set_keep_last($n) {
+		update_option(self::$wp_option_keep_last, max(0, (int) $n), false);
+	}
+
+	/**
+	 * Delete oldest archives beyond the "keep last N" limit.
+	 */
+	public function cleanup_old_archives() {
+		$keep = $this->get_keep_last();
+
+		if ($keep < 1) {
+			return; // unlimited
+		}
+
+		$archives = $this->get_archives(); // already sorted newest-first
+		$i = 0;
+
+		foreach ($archives as $archive) {
+			if (++$i > $keep) {
+				@unlink($archive['path']);
+			}
+		}
+	}
+
+	/**
+	 * @internal
+	 * @param FW_Ext_Backups_Task $task
+	 */
+	public function _action_cleanup_old_archives($task) {
+		if (
+			is_object($task)
+			&&
+			method_exists($task, 'get_type')
+			&&
+			$task->get_type() === 'zip'
+		) {
+			$this->cleanup_old_archives();
+		}
+	}
+
+	/**
+	 * @internal Save the selective-backup folder selection + keep-last value.
+	 */
+	public function _action_ajax_save_options() {
+		if (!current_user_can($this->get_capability())) {
+			wp_send_json_error(new WP_Error('denied', 'Access Denied'));
+		}
+
+		if (
+			empty($_POST['nonce'])
+			||
+			!wp_verify_nonce($_POST['nonce'], self::$wp_ajax_action_options)
+		) {
+			wp_send_json_error(new WP_Error('invalid_nonce', __('Invalid nonce', 'fw')));
+		}
+
+		$posted = (isset($_POST['excluded']) && is_array($_POST['excluded']))
+			? $_POST['excluded']
+			: array();
+
+		// Arrives as {plugins: ['akismet', ...], ...}; convert to {name: true}
+		$excluded = array('plugins' => array(), 'themes' => array(), 'uploads' => array());
+		foreach (array('plugins', 'themes', 'uploads') as $cat) {
+			if (!empty($posted[$cat]) && is_array($posted[$cat])) {
+				foreach ($posted[$cat] as $name) {
+					$excluded[$cat][(string) $name] = true;
+				}
+			}
+		}
+
+		$this->set_excluded_dirs($excluded);
+		$this->set_keep_last(isset($_POST['keep_last']) ? $_POST['keep_last'] : 0);
+
+		wp_send_json_success();
+	}
+
+	/**
+	 * @internal Store an uploaded .zip backup into the archives directory.
+	 */
+	public function _action_ajax_upload() {
+		if (!current_user_can($this->get_capability())) {
+			wp_send_json_error(new WP_Error('denied', 'Access Denied'));
+		}
+
+		if (
+			empty($_POST['nonce'])
+			||
+			!wp_verify_nonce($_POST['nonce'], self::$wp_ajax_action_upload)
+		) {
+			wp_send_json_error(new WP_Error('invalid_nonce', __('Invalid nonce', 'fw')));
+		}
+
+		if (
+			empty($_FILES['file'])
+			||
+			!isset($_FILES['file']['tmp_name'])
+			||
+			!is_uploaded_file($_FILES['file']['tmp_name'])
+		) {
+			wp_send_json_error(new WP_Error('no_file', __('No file uploaded', 'fw')));
+		}
+
+		$file = $_FILES['file'];
+
+		if (!empty($file['error'])) {
+			wp_send_json_error(new WP_Error(
+				'upload_error', sprintf(__('Upload error (code %d)', 'fw'), (int) $file['error'])
+			));
+		}
+
+		$filename = sanitize_file_name(basename($file['name']));
+
+		if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'zip') {
+			wp_send_json_error(new WP_Error('not_zip', __('Only .zip backup files are allowed', 'fw')));
+		}
+
+		if (!class_exists('ZipArchive')) {
+			wp_send_json_error(new WP_Error('zip_missing', __('PHP Zip extension is required', 'fw')));
+		}
+
+		// Validate that the zip looks like a backup made by this extension
+		$zip = new ZipArchive();
+		if (true !== $zip->open($file['tmp_name'])) {
+			wp_send_json_error(new WP_Error('bad_zip', __('The file is not a valid zip archive', 'fw')));
+		}
+
+		$looks_like_backup = (
+			$zip->locateName('database.json.txt') !== false
+			||
+			$zip->locateName('database.json') !== false
+		);
+
+		if (!$looks_like_backup) {
+			for ($i = 0; $i < $zip->numFiles; $i++) {
+				$stat = $zip->statIndex($i);
+				if ($stat && strpos($stat['name'], 'f/') === 0) {
+					$looks_like_backup = true;
+					break;
+				}
+			}
+		}
+
+		$zip->close();
+
+		if (!$looks_like_backup) {
+			wp_send_json_error(new WP_Error(
+				'not_backup',
+				__('This zip does not look like a backup created by this extension.', 'fw')
+			));
+		}
+
+		$dest_dir = $this->get_backups_dir();
+		if (!is_dir($dest_dir) && !wp_mkdir_p($dest_dir)) {
+			wp_send_json_error(new WP_Error('mkdir_fail', __('Cannot create backups directory', 'fw')));
+		}
+
+		$target = $dest_dir .'/'. $filename;
+		if (file_exists($target)) { // don't overwrite an existing archive
+			$target = $dest_dir .'/'. pathinfo($filename, PATHINFO_FILENAME) .'-'. time() .'.zip';
+		}
+
+		if (!@move_uploaded_file($file['tmp_name'], $target)) {
+			wp_send_json_error(new WP_Error('move_fail', __('Failed to store the uploaded file', 'fw')));
+		}
+
+		wp_send_json_success();
 	}
 
 	/**
