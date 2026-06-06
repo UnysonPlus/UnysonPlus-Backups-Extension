@@ -19,3 +19,65 @@
 	list-style-type: disc;
 	padding-left: 18px;
 }
+
+/* Backup progress bar (shown while a backup/restore is running) */
+.fw-ext-backups-progress {
+	display: block;
+	position: relative;
+	width: 100%;
+	max-width: 480px;
+	height: 20px;
+	margin: 10px 0 2px;
+	background: #e2e4e7;
+	border-radius: 10px;
+	overflow: hidden;
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, .12);
+}
+
+.fw-ext-backups-progress-bar {
+	display: block;
+	position: relative;
+	height: 100%;
+	width: 0;
+	border-radius: 10px;
+	background: linear-gradient(90deg, #2271b1, #45a3e6);
+	transition: width .6s ease;
+	overflow: hidden;
+}
+
+/* Subtle moving stripes so the bar reads as "busy" even while % is steady */
+.fw-ext-backups-progress-bar:after {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
+	background-image: linear-gradient(
+		45deg,
+		rgba(255, 255, 255, .18) 25%, transparent 25%,
+		transparent 50%, rgba(255, 255, 255, .18) 50%,
+		rgba(255, 255, 255, .18) 75%, transparent 75%, transparent
+	);
+	background-size: 24px 24px;
+	animation: fw-ext-backups-progress-stripes 1s linear infinite;
+	pointer-events: none;
+}
+
+.fw-ext-backups-progress-text {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 20px;
+	line-height: 20px;
+	text-align: center;
+	font-size: 12px;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+@keyframes fw-ext-backups-progress-stripes {
+	from { background-position: 0 0; }
+	to   { background-position: 24px 0; }
+}
