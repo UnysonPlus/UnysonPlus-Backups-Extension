@@ -39,7 +39,16 @@ class FW_Ext_Backups_Task_Type_Dir_Clean extends FW_Ext_Backups_Task_Type {
 		}
 
 		/**
-		 * Additional backups dir security check
+		 * Additional backups dir security check (best-effort).
+		 *
+		 * These index.php / .htaccess files are only defense-in-depth (prevent
+		 * directory listing and direct file access). On some managed hosts they
+		 * cannot be created:
+		 *  - WP Engine and similar platforms block writing *.php files into the
+		 *    uploads directory as an anti-malware measure.
+		 *  - .htaccess has no effect on nginx-based hosts.
+		 * A failure here must NOT abort the backup, otherwise the whole process
+		 * dies on the very first task. Try to create them, but continue on failure.
 		 */
 		{
 			$backups_dir = fw_ext('backups')->get_backups_dir();
@@ -50,11 +59,7 @@ class FW_Ext_Backups_Task_Type_Dir_Clean extends FW_Ext_Backups_Task_Type {
 					'header(\'HTTP/1.0 403 Forbidden\');',
 					'die(\'<h1>Forbidden</h1>\');'
 				));
-				if (@file_put_contents("$backups_dir/index.php", $contents) === false) {
-					return new WP_Error(
-						'index_create_fail', sprintf( __('Cannot create file: %s', 'fw'), "$backups_dir/index.php" )
-					);
-				}
+				@file_put_contents("$backups_dir/index.php", $contents);
 			}
 
 			if (!file_exists("$backups_dir/.htaccess")) {
@@ -65,11 +70,7 @@ class FW_Ext_Backups_Task_Type_Dir_Clean extends FW_Ext_Backups_Task_Type {
 					'    RewriteRule . - [R=404,L]',
 					'</IfModule>'
 				));
-				if (@file_put_contents("$backups_dir/.htaccess", $contents) === false) {
-					return new WP_Error(
-						'htaccess_create_fail', sprintf( __('Cannot create file: %s', 'fw'), "$backups_dir/htaccess" )
-					);
-				}
+				@file_put_contents("$backups_dir/.htaccess", $contents);
 			}
 		}
 
