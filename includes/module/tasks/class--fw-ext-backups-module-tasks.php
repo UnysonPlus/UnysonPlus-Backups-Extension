@@ -578,7 +578,10 @@ class _FW_Ext_Backups_Module_Tasks extends _FW_Ext_Backups_Module {
 			$task->set_result(
 				$task_type->execute( $task->get_args(), $state )
 			);
-		} catch (Exception $e) {
+		} catch (Throwable $e) {
+			// Catch both Exception and Error (PHP 7+/8). A bare catch (Exception)
+			// would let PHP Errors (TypeError, etc.) escape and silently kill the
+			// background loopback request, making a backup appear to "do nothing".
 			$task->set_result(
 				new WP_Error('exception', $e->getMessage())
 			);

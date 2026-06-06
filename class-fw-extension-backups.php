@@ -465,17 +465,20 @@ class FW_Extension_Backups extends FW_Extension {
 
 	/**
 	 * @internal
+	 *
+	 * Register the Backup page as a submenu of the Unyson+ ("fw-extensions") menu
+	 * instead of the WordPress "Tools" menu. The Unyson+ menu is registered by the
+	 * extensions manager on both admin_menu and network_admin_menu, so the same
+	 * parent slug works for single-site and network admin.
 	 */
 	public function _action_admin_menu() {
-		call_user_func_array(
-			is_multisite() && is_network_admin() ? 'add_menu_page' : 'add_management_page',
-			array(
-				__( 'Backup', 'fw' ),
-				__( 'Backup', 'fw' ),
-				$this->get_capability(),
-				$this->get_page_slug(),
-				array( $this, '_render_page' )
-			)
+		add_submenu_page(
+			'fw-extensions',
+			__( 'Backup', 'fw' ),
+			__( 'Backup', 'fw' ),
+			$this->get_capability(),
+			$this->get_page_slug(),
+			array( $this, '_render_page' )
 		);
 	}
 
