@@ -491,7 +491,24 @@ class FW_Extension_Backups extends FW_Extension {
 
 		if ($this->server_requirements_not_met()) {
 			return $archives;
-		} elseif ($paths = glob($this->get_backups_dir() .'/*.zip')) {
+		}
+
+		/**
+		 * Scan the current backups dir and the legacy /uploads location, so
+		 * archives created before backups were moved out of /uploads stay
+		 * listable (and thus downloadable/deletable via their full path).
+		 */
+		$paths = array();
+		foreach (array_unique(array(
+			$this->get_backups_dir(),
+			fw_ext_backups_legacy_destination_directory(),
+		)) as $dir) {
+			if ($found = glob($dir .'/*.zip')) {
+				$paths = array_merge($paths, $found);
+			}
+		}
+
+		if ($paths) {
 			foreach ( $paths as $path ) {
 				{
 					$zip = new ZipArchive();

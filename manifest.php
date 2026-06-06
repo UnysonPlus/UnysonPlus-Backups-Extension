@@ -12,7 +12,7 @@ $manifest['description'] = __(
     'unysonplus'
 );
 
-$manifest['version']     = '2.0.37';
+$manifest['version']     = '2.0.38';
 $manifest['display']     = true;
 $manifest['standalone']  = true;
 

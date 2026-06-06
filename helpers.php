@@ -301,6 +301,33 @@ function fw_ext_backups_unzip_partial($zip, $destination_dir, $last_entry = '', 
 }
 
 function fw_ext_backups_destination_directory() {
+	/**
+	 * Store backups in wp-content/fw-backup (outside the uploads directory).
+	 *
+	 * Some managed hosts (e.g. WP Engine) block writing *.php files anywhere
+	 * under wp-content/uploads as an anti-malware measure. A full backup stages
+	 * plugins/themes (which contain .php files) before zipping, so uploads can't
+	 * be used. wp-content allows .php (plugins/themes already live there), so
+	 * backups work on those hosts too.
+	 *
+	 * Backups are never served directly by URL — they are streamed through a
+	 * capability-checked PHP handler (FW_Extension_Backups::_action_download()).
+	 *
+	 * Filterable so a site can override the location if needed.
+	 */
+	return fw_fix_path( apply_filters(
+		'fw:ext:backups:destination_directory',
+		fw_fix_path( WP_CONTENT_DIR ) . '/fw-backup'
+	) );
+}
+
+/**
+ * Legacy backups location used before backups were moved out of /uploads.
+ * Kept so archives created by older versions remain listable/downloadable.
+ * @return string
+ * @since 2.0.38
+ */
+function fw_ext_backups_legacy_destination_directory() {
 	$uploads = wp_upload_dir();
 
 	return fw_fix_path( $uploads['basedir'] ) . '/fw-backup';
