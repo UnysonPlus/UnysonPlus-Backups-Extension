@@ -138,10 +138,29 @@ class FW_Ext_Backups_Task_Type_Files_Export extends FW_Ext_Backups_Task_Type {
 					$created_dirs[$destination_dir] = true;
 				}
 
-				if (!copy(
+				if (!@copy(
 					$source_dir .'/'. $file,
 					$destination_dir .'/'. $file
 				)) {
+					/**
+					 * Some managed hosts (e.g. WP Engine) refuse to write certain
+					 * files such as .htaccess (and .php inside uploads). Aborting the
+					 * entire backup because of one un-writable, non-essential,
+					 * server-specific file is worse than skipping it, so by default we
+					 * skip and continue. Return the old fatal behaviour via the filter.
+					 */
+					if (apply_filters(
+						'fw:ext:backups:files-export:skip-uncopyable',
+						true,
+						$source_dir .'/'. $file
+					)) {
+						trigger_error(
+							'Backups: skipped un-copyable file: '. $source_dir .'/'. $file,
+							E_USER_WARNING
+						);
+						continue;
+					}
+
 					return new WP_Error(
 						'copy_failed', sprintf(__('Failed to copy: %s', 'fw'), $source_dir .'/'. $file)
 					);
