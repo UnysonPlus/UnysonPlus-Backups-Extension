@@ -5,6 +5,18 @@
 /**
  * Changelog ----------------------------------------------------------------
  *
+ * 2.0.45 - Restore now fixes subdirectory-move URLs. When a site installed in a
+ *          subfolder (e.g. /unysonplus) is restored to a different path such as the
+ *          domain root, the restore also rewrites ROOT-RELATIVE paths that carried
+ *          the old subdirectory ("/unysonplus/wp-content/..." to "/wp-content/...")
+ *          by mapping the old home PATH prefix to the new one, and now matches URLs
+ *          embedded mid-string inside builder JSON (the escaped-slash form), so
+ *          images and assets referenced by root-relative paths no longer 404 after
+ *          moving a subdir install to a root domain.
+ *
+ * 2.0.44 - Renamed the section label to "Backups" (menu, page heading, extension
+ *          name) for consistency with the plural internal identifiers.
+ *
  * 2.0.43 - Server-settings advisory + updated docs links. The Backup page now
  *          compares the host's PHP limits (upload_max_filesize, post_max_size,
  *          memory_limit, max_execution_time, max_input_time, max_input_vars)
@@ -38,7 +50,7 @@ $manifest['description'] = __(
     'unysonplus'
 );
 
-$manifest['version']     = '2.0.44';
+$manifest['version']     = '2.0.45';
 $manifest['display']     = true;
 $manifest['standalone']  = true;
 

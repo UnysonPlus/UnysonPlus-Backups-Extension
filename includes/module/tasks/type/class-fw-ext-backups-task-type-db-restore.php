@@ -575,6 +575,21 @@ class FW_Ext_Backups_Task_Type_DB_Restore extends FW_Ext_Backups_Task_Type {
 				}
 			}
 
+			/**
+			 * Subdirectory move: a source installed in a subfolder (e.g. /unysonplus)
+			 * restored to a different path (e.g. the domain root) leaves ROOT-RELATIVE
+			 * paths like "/unysonplus/wp-content/..." that carry no host, so the URL
+			 * replacements above never match them. Map the old home PATH prefix to the
+			 * new one so those root-relative asset paths and links are corrected too.
+			 */
+			{
+				$old_home_path = rtrim((string) parse_url((string) $state['params']['home'], PHP_URL_PATH), '/');
+				$new_home_path = rtrim((string) parse_url((string) get_option('home'), PHP_URL_PATH), '/');
+				if ($old_home_path !== '' && $old_home_path !== $new_home_path) {
+					$search_replace[$old_home_path . '/'] = $new_home_path . '/';
+				}
+			}
+
 			// Add all possible combinations of encoding
 			foreach ($search_replace as $search => $replace) {
 				if ($search === $replace) {
@@ -584,6 +599,7 @@ class FW_Ext_Backups_Task_Type_DB_Restore extends FW_Ext_Backups_Task_Type {
 				$_search_replace = array(
 					$search => $replace,
 					json_encode($search) => json_encode($replace),
+					str_replace('/', '\/', $search) => str_replace('/', '\/', $replace), // escaped slashes inside JSON strings (mid-value, e.g. code_block src)
 				);
 
 				/**
