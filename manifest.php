@@ -5,6 +5,15 @@
 /**
  * Changelog ----------------------------------------------------------------
  *
+ * 2.0.43 - Server-settings advisory + updated docs links. The Backup page now
+ *          compares the host's PHP limits (upload_max_filesize, post_max_size,
+ *          memory_limit, max_execution_time, max_input_time, max_input_vars)
+ *          against the values a reliable backup/restore needs, and shows a
+ *          warning table listing any that are too low - a common cause of a
+ *          silently failing backup upload on shared hosting. The LiteSpeed notice
+ *          and the extension's docs link now point at the Unyson+ manual
+ *          (unysonplus.github.io) instead of the retired unyson.io article.
+ *
  * 2.0.41 - Selective backup, automatic cleanup, and backup upload. You can now
  *          un-check individual top-level Plugins / Themes / Uploads folders to
  *          exclude them from backups (Plugins and Themes apply to full backups,
@@ -29,7 +38,7 @@ $manifest['description'] = __(
     'unysonplus'
 );
 
-$manifest['version']     = '2.0.41';
+$manifest['version']     = '2.0.43';
 $manifest['display']     = true;
 $manifest['standalone']  = true;
 
@@ -37,7 +46,7 @@ $manifest['standalone']  = true;
 $manifest['github_update'] = 'UnysonPlus/UnysonPlus-Backups-Extension';
 $manifest['github_repo']   = 'https://github.com/UnysonPlus/UnysonPlus-Backups-Extension';
 $manifest['github_branch'] = 'master';
-$manifest['uri']           = 'http://manual.unyson.io/en/latest/extension/backups/index.html';
+$manifest['uri']           = 'https://unysonplus.github.io/docs/extensions/backups';
 
 // Author Info
 $manifest['author']     = 'UnysonPlus';

@@ -210,10 +210,10 @@ class FW_Extension_Backups extends FW_Extension {
 
 		echo
 			'<div class="notice notice-warning">
-				<p><strong>Unyson: </strong>' .
+				<p><strong>Unyson+: </strong>' .
 					sprintf(
 						esc_html__( 'Your website is hosted using the LiteSpeed web server. Please consult this %sarticle%s if you have problems backing up.', 'fw' ),
-						'<a href="http://manual.unyson.io/en/latest/extension/backups/index.html#litespeed-webserver" target="_blank">',
+						'<a href="https://unysonplus.github.io/docs/extensions/backups#litespeed-web-server" target="_blank" rel="noopener">',
 						'</a>'
 					) .
 				'</p>

@@ -30,6 +30,56 @@ $page_url = $backups->get_page_url();
 		<script type="text/javascript">var fw_ext_backups_loopback_failed = true;</script>
 	<?php endif; ?>
 
+	<?php
+	// --- Server settings advisory: compare PHP limits vs recommended (backup/restore need headroom) ---
+	$fw_b2i = function ( $v ) { $v = trim( (string) $v ); if ( $v === '' ) return 0; if ( $v === '-1' ) return -1; $l = strtolower( substr( $v, -1 ) ); $n = (float) $v; if ( $l === 'g' ) $n *= 1073741824; elseif ( $l === 'm' ) $n *= 1048576; elseif ( $l === 'k' ) $n *= 1024; return (int) $n; };
+	$fw_hb  = function ( $b ) { if ( $b < 0 ) return 'unlimited'; $u = array( 'B', 'KB', 'MB', 'GB' ); $i = 0; while ( $b >= 1024 && $i < 3 ) { $b /= 1024; $i++; } return round( $b ) . ' ' . $u[ $i ]; };
+	$fw_reqs = array(
+		array( 'upload_max_filesize', __( 'Max upload size', 'fw' ),    true,  67108864,  134217728 ),
+		array( 'post_max_size',       __( 'Max POST size', 'fw' ),      true,  67108864,  134217728 ),
+		array( 'memory_limit',        __( 'Memory limit', 'fw' ),       true,  134217728, 268435456 ),
+		array( 'max_execution_time',  __( 'Max execution time', 'fw' ), false, 120,       300 ),
+		array( 'max_input_time',      __( 'Max input time', 'fw' ),     false, 120,       300 ),
+		array( 'max_input_vars',      __( 'Max input vars', 'fw' ),     false, 2000,      3000 ),
+	);
+	$fw_issues = array();
+	foreach ( $fw_reqs as $fw_r ) {
+		list( $fw_name, $fw_label, $fw_is_size, $fw_min, $fw_rec ) = $fw_r;
+		$fw_raw = ini_get( $fw_name );
+		if ( $fw_is_size ) { $fw_cur = $fw_b2i( $fw_raw ); $fw_unl = ( $fw_cur === -1 ); }
+		else { $fw_cur = (int) $fw_raw; $fw_unl = ( $fw_cur <= 0 ); }
+		if ( ! $fw_unl && $fw_cur < $fw_min ) {
+			$fw_issues[] = array(
+				'label' => $fw_label, 'name' => $fw_name,
+				'cur'   => $fw_is_size ? $fw_raw : ( $fw_cur . 's' ),
+				'rec'   => $fw_is_size ? $fw_hb( $fw_rec ) : ( $fw_name === 'max_input_vars' ? (string) $fw_rec : $fw_rec . 's' ),
+			);
+		}
+	}
+	?>
+	<?php if ( $fw_issues ) : ?>
+		<div style="border-left:4px solid #dba617;background:#fff8e6;padding:10px 14px;margin:12px 0;">
+			<p style="margin-top:0"><strong><?php esc_html_e( 'Heads up — your hosting limits look low', 'fw' ); ?>:</strong>
+			<?php esc_html_e( 'some PHP settings are below the values recommended for reliable backups and restores (uploading a backup can silently fail). On cPanel, raise them in MultiPHP INI Editor (or a .user.ini), then reload this page.', 'fw' ); ?></p>
+			<table class="widefat striped" style="max-width:540px;margin:8px 0">
+				<thead><tr><th><?php esc_html_e( 'Setting', 'fw' ); ?></th><th><?php esc_html_e( 'Your value', 'fw' ); ?></th><th><?php esc_html_e( 'Recommended', 'fw' ); ?></th></tr></thead>
+				<tbody>
+				<?php foreach ( $fw_issues as $fw_it ) : ?>
+					<tr>
+						<td><?php echo esc_html( $fw_it['label'] ); ?> <code style="font-size:11px"><?php echo esc_html( $fw_it['name'] ); ?></code></td>
+						<td style="color:#b32d2e;font-weight:600"><?php echo esc_html( $fw_it['cur'] ); ?></td>
+						<td style="color:#137333;font-weight:600"><?php echo esc_html( $fw_it['rec'] ); ?></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p class="description" style="margin-bottom:0"><?php printf(
+				__( 'The largest file you can upload is the smaller of Max upload size and Max POST size. See %s for details.', 'fw' ),
+				'<a href="https://unysonplus.github.io/docs/installation#recommended-php-settings" target="_blank" rel="noopener">' . esc_html__( 'Installation → Requirements', 'fw' ) . '</a>'
+			); ?></p>
+		</div>
+	<?php endif; ?>
+
 	<div class="fw-ext-backups-description">
 		<p class="description"><?php esc_html_e( 'Here you can create a backup schedule for your website.', 'fw' ); ?></p>
 		<ul>
