@@ -138,7 +138,7 @@ class FW_Extension_Backups extends FW_Extension {
 					'href' => function_exists('menu_page_url')
 						? menu_page_url(fw()->extensions->manager->get_page_slug(), false) .'#ext-backups'
 						: '#',
-				), __('Unyson Backup', 'fw')),
+				), __('Unyson+ Backups', 'fw')),
 				fw_html_tag('a', array(
 					'href' => 'https://www.google.com/search#q=hosting+enable+php+zip',
 					'target' => '_blank',
@@ -499,8 +499,8 @@ class FW_Extension_Backups extends FW_Extension {
 	public function _action_admin_menu() {
 		add_submenu_page(
 			'fw-extensions',
-			__( 'Backup', 'fw' ),
-			__( 'Backup', 'fw' ),
+			__( 'Backups', 'fw' ),
+			__( 'Backups', 'fw' ),
 			$this->get_capability(),
 			$this->get_page_slug(),
 			array( $this, '_render_page' )

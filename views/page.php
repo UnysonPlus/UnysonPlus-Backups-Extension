@@ -8,7 +8,7 @@
 $backups = fw_ext( 'backups' ); /** @var FW_Extension_Backups $backups */
 $page_url = $backups->get_page_url();
 ?>
-<h2><?php esc_html_e('Backup', 'fw') ?> <span id="fw-ext-backups-status"></span></h2>
+<h2><?php esc_html_e('Backups', 'fw') ?> <span id="fw-ext-backups-status"></span></h2>
 
 <div>
 	<?php if ( !class_exists('ZipArchive') ): ?>
